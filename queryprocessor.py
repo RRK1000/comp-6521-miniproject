@@ -12,10 +12,9 @@ class QProcessor:
         return
 
     def processSelectQuery(self, query):
-        query = query.lower()
-        # select a,b,c from R,S where cond1 and cond2
-        self.project.extend(query.split("from")[0].split(" ")[1].split(","))
-        self.clauses.extend(query.split("where")[1].strip(" ").split(" "))
+        query = query.lower().strip(";")
+        self.project.extend([i.strip(" ") for i in query.split("from")[0].lstrip("select ").split(",")])
+        self.clauses.extend([i.strip(" ") for i in query.split("where")[1].strip(" ").split(" ")])
 
         for relation in query.split("from")[1].split("where")[0].split(","):
             self.relationList.append(relation.strip(' '))
