@@ -19,8 +19,8 @@ if __name__ == "__main__":
     conn = getDBConn()
     queryprocessor = queryprocessor.QProcessor()
 
-    query = """SELECT A2, A3 FROM R, S WHERE R.A2 = S.B2 AND R.A3 = S.B3;"""
-    queryprocessor.processSelectQuery(query)
+    query = """SELECT product, product_type FROM routes, products WHERE product = products.product_id AND region_from = 1;"""
+    queryprocessor.processSelectQuery(conn, query)
     queryprocessor.displayTokens()
 
     # Creating a cursor object using the cursor() method
