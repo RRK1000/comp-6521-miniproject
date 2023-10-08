@@ -1,8 +1,11 @@
+import itertools
+
 class QProcessor:
     project = []
     clauses = []
     relationList = []
     relationInfo = {}
+    joinRelationInfo = {}
 
     def displayTokens(self):
         print("Projection List: ", self.project)
@@ -32,36 +35,43 @@ class QProcessor:
             [i.strip(" ") for i in query.split("where")[1].strip(" ").split(" ")]
         )
 
+        # relation list
         for relation in query.split("from")[1].split("where")[0].split(","):
             self.relationList.append(relation.strip(" "))
+
         return
 
-    def processJoin(self, conn, relation1, relation2):
+    def processJoin(self, conn, relationList):
         result = []
+        relationDataDict = {}
         cursor = conn.cursor()
 
-        # first relation
-        query = """select * from """
-        cursor.execute(query + relation1)
-        relation1data = cursor.fetchall()
-        relation1colData = {
-            ele: pos for pos, ele in enumerate([desc[0] for desc in cursor.description])
-        }
-        self.relationInfo[relation1] = relation1colData
+        # fetching data from postgresql
+        for relation in relationList:
+            query = """select * from """
+            cursor.execute(query + relation)
+            relationdata = cursor.fetchall()
+            relationColData = {
+                ele: pos for pos, ele in enumerate([desc[0] for desc in cursor.description])
+            }
+            self.relationInfo[relation] = relationColData
+            relationDataDict[relation] = relationdata
 
-        # second relation
-        query = """select * from """
-        cursor.execute(query + relation2)
-        relation2data = cursor.fetchall()
-        relation2colData = {
-            ele: pos for pos, ele in enumerate([desc[0] for desc in cursor.description])
-        }
-        self.relationInfo[relation2] = relation2colData
+        idx = 0
+        # updating self.joinRelationInfo
+        for relation, info in self.relationInfo.items():
+            for column in info:
+                self.joinRelationInfo[relation + '.' + column] = idx
+                idx += 1
 
-        for item1 in relation1data:
-            for item2 in relation2data:
-                result.append(item1 + item2)
-
+        # computing the cartesian product
+        for tuple in itertools.product(*relationDataDict.values(), repeat=1):
+            row = ""
+            for item in tuple:
+                row += str(item)
+            result.append(row.replace(")(", ", "))
+        self.displayTokens()
+        print(len(result))
         return result
 
     def processSelectQuery(self, conn, query):
@@ -70,24 +80,33 @@ class QProcessor:
         # processing relation join
         joinResult = []
         if len(self.relationList) > 1:
-            joinResult = self.processJoin(
-                conn, self.relationList[0], self.relationList[1]
-            )
-
-        # for row in joinResult:
-        #     print(row)
+            joinResult = self.processJoin(conn, self.relationList)
 
         # processing where clauses
         whereResult = []
-        whereResult = self.processWhere(
-            joinResult, self.relationList[0], self.relationList[1], self.clauses
-        )
+        whereResult = self.processWhere(joinResult, self.clauses)
+        print(len(whereResult))
 
+
+        projectionResult = []
         # processing projections
+        idxList = []
+        flag = True
+        for column in self.project:
+            idxList.append(
+                self.relationInfo[self.findRelation(column)][column]
+            ) if flag else idxList.append(
+                6 + self.relationInfo[self.findRelation(column)][column]
+            )
+            flag = not flag
+        for row in whereResult:
+            tuple = []
+            for idx in idxList:
+                tuple.append(row[idx])
+            projectionResult.append(tuple)
+        return projectionResult
 
-        return
-
-    def processWhere(self, joinResult, relation1, relation2, clauses):
+    def processWhere(self, joinResult, clauses):
         # clauses = ['product', '=', 'products.product_id']
         # clauses = ['product', '=', 'products.product_id', 'and', 'region_from', '=', '1']
         # clauses = ['product', '=', 'products.product_id', 'or', 'region_from', '=', '1']
@@ -95,6 +114,7 @@ class QProcessor:
         conditionList = []
         while i + 3 <= len(clauses):
             if clauses[i] == "and" or clauses[i] == "or":
+                conditionList.append(clauses[i])
                 i += 1
                 continue
 
@@ -113,32 +133,54 @@ class QProcessor:
                 str(clauses[i]) + str(clauses[i + 1]) + str(clauses[i + 2])
             )
             i += 3
-        print("Condition List:" + " ".join(conditionList))
+        print("Condition List:" + ",".join(conditionList))
+        print("JoinInfo List:",  self.joinRelationInfo)
+        print()
 
         whereResult = []
+        operators = ['<', '>', '=']
         for tuple in joinResult:
-            for condition in conditionList:
-                # print("Tuple: ", tuple)
-                # print("Condition: ", condition)
-                lidx = self.relationInfo[condition.split("=")[0].split(".")[0]][
-                    condition.split("=")[0].split(".")[1]
-                ]
-                ridx = -1
-                if "." in condition.split("=")[1]:
-                    ridx = len(self.relationInfo[condition.split("=")[0].split(".")[0]])
-                    +self.relationInfo[condition.split("=")[1].split(".")[0]][
-                        condition.split("=")[1].split(".")[1]
-                    ]
-                # print("lidx: ", lidx, " ridx: ", ridx)
-                # print("Checking: ", tuple[lidx], " = ", condition.split("=")[1] if ridx == -1 else tuple[ridx])
-                if tuple[lidx] == (
-                    condition.split("=")[1] if ridx == -1 else tuple[ridx]
-                ):
-                    whereResult.append(tuple)
-                    print(tuple)
-            # print()
-            # print()
-        return
+            tuple = str(tuple).lstrip('(').rstrip(')').split(", ")
+            isTupleValid = []
+            for i in range(len(conditionList)):
+                cond = conditionList[i]
+                if cond == "and" or cond == "or":
+                    isTupleValid.append(cond)
+                    continue
+                
+                for op in operators:
+                    if len(cond.split(op)) > 1:
+                        lhs = tuple[self.joinRelationInfo[cond.split(op)[0]]].lower()
+                        rhs = tuple[self.joinRelationInfo[cond.split(op)[1]]] if "." in cond.split(op)[1] else cond.split(op)[1].lower()
+                        
+                        if op == '<':
+                            isTupleValid.append(str(lhs < rhs))
+                        elif op == '>':
+                            isTupleValid.append(str(lhs > rhs))
+                        elif op == '=':
+                            isTupleValid.append(str(lhs == rhs))
+            
+            # Single condition case
+            if(len(isTupleValid) == 1 and isTupleValid[0] == "True"):
+                whereResult.append(tuple)
+                continue
+            
+            # multiple condition case
+            isValid = False
+            if(isTupleValid[1] == "and"):
+                isValid = isTupleValid[0] and isTupleValid[2]
+            else:
+                isValid = isTupleValid[0] or isTupleValid[2]
+            
+            for i in range(3, len(isTupleValid)-1):
+                if(isTupleValid[i] == "and"):
+                    isValid = isValid and isTupleValid[i+1]
+                elif(isTupleValid[i] == "or"):
+                    isValid = isValid or isTupleValid[i+1]
+            if(isValid):
+                whereResult.append(tuple)
+    
+        return whereResult
 
     def processWhereWithAnd(self, joinResult, clauses):
         # clauses = ['product', '=', 'products.product_id', 'and', 'region_from', '=', '1']
