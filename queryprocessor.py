@@ -12,6 +12,7 @@ class QProcessor:
         print("Clause List: ", self.clauses)
         print("Relation List: ", self.relationList)
         print("RelationInfo: ", self.relationInfo)
+        print("JoinInfo List:",  self.joinRelationInfo)
 
     def findRelation(self, column) -> str:
         for i in self.relationInfo.keys():
@@ -70,8 +71,6 @@ class QProcessor:
             for item in tuple:
                 row += str(item)
             result.append(row.replace(")(", ", "))
-        self.displayTokens()
-        print(len(result))
         return result
 
     def processSelectQuery(self, conn, query):
@@ -85,20 +84,12 @@ class QProcessor:
         # processing where clauses
         whereResult = []
         whereResult = self.processWhere(joinResult, self.clauses)
-        print(len(whereResult))
 
-
-        projectionResult = []
         # processing projections
+        projectionResult = []
         idxList = []
-        flag = True
         for column in self.project:
-            idxList.append(
-                self.relationInfo[self.findRelation(column)][column]
-            ) if flag else idxList.append(
-                6 + self.relationInfo[self.findRelation(column)][column]
-            )
-            flag = not flag
+            idxList.append(self.joinRelationInfo[self.findRelation(column) + "." + column])
         for row in whereResult:
             tuple = []
             for idx in idxList:
@@ -133,9 +124,8 @@ class QProcessor:
                 str(clauses[i]) + str(clauses[i + 1]) + str(clauses[i + 2])
             )
             i += 3
-        print("Condition List:" + ",".join(conditionList))
-        print("JoinInfo List:",  self.joinRelationInfo)
-        print()
+        # print("Condition List:" + ",".join(conditionList))
+        # print()
 
         whereResult = []
         operators = ['<', '>', '=']
@@ -168,26 +158,16 @@ class QProcessor:
             # multiple condition case
             isValid = False
             if(isTupleValid[1] == "and"):
-                isValid = isTupleValid[0] and isTupleValid[2]
+                isValid = eval(isTupleValid[0]) and eval(isTupleValid[2])
             else:
-                isValid = isTupleValid[0] or isTupleValid[2]
+                isValid = eval(isTupleValid[0]) or eval(isTupleValid[2])
             
             for i in range(3, len(isTupleValid)-1):
                 if(isTupleValid[i] == "and"):
-                    isValid = isValid and isTupleValid[i+1]
+                    isValid = isValid and eval(isTupleValid[i+1])
                 elif(isTupleValid[i] == "or"):
-                    isValid = isValid or isTupleValid[i+1]
+                    isValid = isValid or eval(isTupleValid[i+1])
             if(isValid):
                 whereResult.append(tuple)
     
         return whereResult
-
-    def processWhereWithAnd(self, joinResult, clauses):
-        # clauses = ['product', '=', 'products.product_id', 'and', 'region_from', '=', '1']
-
-        return
-
-    def processWhereWithOr(self, joinResult, clauses):
-        # clauses = ['product', '=', 'products.product_id', 'or', 'region_from', '=', '1']
-
-        return
