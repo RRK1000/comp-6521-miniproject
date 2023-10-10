@@ -69,8 +69,18 @@ class QProcessor:
         for tuple in itertools.product(*relationDataDict.values(), repeat=1):
             row = ""
             for item in tuple:
-                row += str(item)
-            result.append(row.replace(")(", ", "))
+                row += str(item).replace("'","")
+            resultItem = row.replace(")(", ", ").lstrip('(').rstrip(')').split(", ")
+            result.append(','.join(map(str, resultItem)))
+        
+        idxList = [self.joinRelationInfo[relation+".ann"] for relation in self.relationList]
+
+        # computing the annotated bucket
+        for i in range(len(result)):
+            bucket = []
+            for idx in idxList:
+                bucket.append(result[i].split(",")[idx])
+            result[i] = (result[i] + "," + '.'.join(map(str, bucket)))
         return result
 
     def processSelectQuery(self, conn, query):
@@ -94,7 +104,10 @@ class QProcessor:
             tuple = []
             for idx in idxList:
                 tuple.append(row[idx])
+            tuple.append(str(row[len(row)-1]))
+            print(tuple)
             projectionResult.append(tuple)
+
         return projectionResult
 
     def processWhere(self, joinResult, clauses):
@@ -130,7 +143,7 @@ class QProcessor:
         whereResult = []
         operators = ['<', '>', '=']
         for tuple in joinResult:
-            tuple = str(tuple).lstrip('(').rstrip(')').split(", ")
+            tuple = str(tuple).split(",")
             isTupleValid = []
             for i in range(len(conditionList)):
                 cond = conditionList[i]
@@ -141,7 +154,7 @@ class QProcessor:
                 for op in operators:
                     if len(cond.split(op)) > 1:
                         lhs = tuple[self.joinRelationInfo[cond.split(op)[0]]].lower()
-                        rhs = tuple[self.joinRelationInfo[cond.split(op)[1]]] if "." in cond.split(op)[1] else cond.split(op)[1].lower()
+                        rhs = tuple[self.joinRelationInfo[cond.split(op)[1]]].lower() if "." in cond.split(op)[1] else cond.split(op)[1].lower().strip("'")
                         
                         if op == '<':
                             isTupleValid.append(str(lhs < rhs))
