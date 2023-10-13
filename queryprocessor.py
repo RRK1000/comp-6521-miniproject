@@ -1,4 +1,5 @@
 import itertools
+from time import perf_counter as pc
 
 class QProcessor:
     project = []
@@ -6,6 +7,7 @@ class QProcessor:
     relationList = []
     relationInfo = {}
     joinRelationInfo = {}
+    selectQueryTime = 0
 
     def displayTokens(self):
         print("Projection List: ", self.project)
@@ -28,7 +30,7 @@ class QProcessor:
 
         # projections
         self.project.extend(
-            [i.strip(" ") for i in query.split("from")[0].lstrip("select ").split(",")]
+            [i.strip(" ") for i in query.split("from")[0].lstrip("select").split(",")]
         )
 
         # where clauses
@@ -84,12 +86,15 @@ class QProcessor:
         return result
 
     def processSelectQuery(self, conn, query):
+        t0 = pc()
+
         self.tokenizeQuery(query)
 
         # processing relation join
         joinResult = []
         if len(self.relationList) > 1:
             joinResult = self.processJoin(conn, self.relationList)
+        self.displayTokens()
 
         # processing where clauses
         whereResult = []
@@ -105,9 +110,9 @@ class QProcessor:
             for idx in idxList:
                 tuple.append(row[idx])
             tuple.append(str(row[len(row)-1]))
-            print(tuple)
             projectionResult.append(tuple)
 
+        self.selectQueryTime =  pc()-t0
         return projectionResult
 
     def processWhere(self, joinResult, clauses):
@@ -117,7 +122,7 @@ class QProcessor:
         i = 0
         conditionList = []
         while i + 3 <= len(clauses):
-            if clauses[i] == "and" or clauses[i] == "or":
+            if clauses[i] == "and" or clauses[i] == "or" or clauses[i] == "in":
                 conditionList.append(clauses[i])
                 i += 1
                 continue
@@ -141,13 +146,13 @@ class QProcessor:
         # print()
 
         whereResult = []
-        operators = ['<', '>', '=']
+        operators = ['<', '>', '=', 'in']
         for tuple in joinResult:
             tuple = str(tuple).split(",")
             isTupleValid = []
             for i in range(len(conditionList)):
                 cond = conditionList[i]
-                if cond == "and" or cond == "or":
+                if cond == "and" or cond == "or" or cond == "in":
                     isTupleValid.append(cond)
                     continue
                 
@@ -162,10 +167,17 @@ class QProcessor:
                             isTupleValid.append(str(lhs > rhs))
                         elif op == '=':
                             isTupleValid.append(str(lhs == rhs))
-            
+                        elif op == 'in':
+                            rhs = rhs.lstrip('(').rstrip(')').split(",")
+                            if(lhs in rhs):
+                                isTupleValid.append("True")
+                            else:
+                                isTupleValid.append("False")
+ 
             # Single condition case
-            if(len(isTupleValid) == 1 and isTupleValid[0] == "True"):
-                whereResult.append(tuple)
+            if(len(isTupleValid) == 1):
+                if(isTupleValid[0] == "True"):
+                    whereResult.append(tuple)
                 continue
             
             # multiple condition case
