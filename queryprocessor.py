@@ -1,6 +1,7 @@
 import itertools
 from time import perf_counter as pc
 
+
 class QProcessor:
     project = []
     clauses = []
@@ -14,7 +15,7 @@ class QProcessor:
         print("Clause List: ", self.clauses)
         print("Relation List: ", self.relationList)
         print("RelationInfo: ", self.relationInfo)
-        print("JoinInfo List:",  self.joinRelationInfo)
+        print("JoinInfo List:", self.joinRelationInfo)
 
     def findRelation(self, column) -> str:
         for i in self.relationInfo.keys():
@@ -35,7 +36,12 @@ class QProcessor:
 
         # where clauses
         self.clauses.extend(
-            [i.strip(" ") for i in query.split("where")[1].strip(" ").split(" ")]
+            [
+                i.strip(" ")
+                if i.strip(" ") not in ["and", "or", "in"]
+                else " " + i + " "
+                for i in query.split("where")[1].strip(" ").split(" ")
+            ]
         )
 
         # relation list
@@ -55,7 +61,8 @@ class QProcessor:
             cursor.execute(query + relation)
             relationdata = cursor.fetchall()
             relationColData = {
-                ele: pos for pos, ele in enumerate([desc[0] for desc in cursor.description])
+                ele: pos
+                for pos, ele in enumerate([desc[0] for desc in cursor.description])
             }
             self.relationInfo[relation] = relationColData
             relationDataDict[relation] = relationdata
@@ -64,25 +71,27 @@ class QProcessor:
         # updating self.joinRelationInfo
         for relation, info in self.relationInfo.items():
             for column in info:
-                self.joinRelationInfo[relation + '.' + column] = idx
+                self.joinRelationInfo[relation + "." + column] = idx
                 idx += 1
 
         # computing the cartesian product
         for tuple in itertools.product(*relationDataDict.values(), repeat=1):
             row = ""
             for item in tuple:
-                row += str(item).replace("'","")
-            resultItem = row.replace(")(", ", ").lstrip('(').rstrip(')').split(", ")
-            result.append(','.join(map(str, resultItem)))
-        
-        idxList = [self.joinRelationInfo[relation+".ann"] for relation in self.relationList]
+                row += str(item).replace("'", "")
+            resultItem = row.replace(")(", ", ").lstrip("(").rstrip(")").split(", ")
+            result.append(",".join(map(str, resultItem)))
+
+        idxList = [
+            self.joinRelationInfo[relation + ".ann"] for relation in self.relationList
+        ]
 
         # computing the annotated bucket
         for i in range(len(result)):
             bucket = []
             for idx in idxList:
                 bucket.append(result[i].split(",")[idx])
-            result[i] = (result[i] + "," + '.'.join(map(str, bucket)))
+            result[i] = result[i] + "," + ".".join(map(str, bucket))
         return result
 
     def processSelectQuery(self, conn, query):
@@ -104,15 +113,17 @@ class QProcessor:
         projectionResult = []
         idxList = []
         for column in self.project:
-            idxList.append(self.joinRelationInfo[self.findRelation(column) + "." + column])
+            idxList.append(
+                self.joinRelationInfo[self.findRelation(column) + "." + column]
+            )
         for row in whereResult:
             tuple = []
             for idx in idxList:
                 tuple.append(row[idx])
-            tuple.append(str(row[len(row)-1]))
+            tuple.append(str(row[len(row) - 1]))
             projectionResult.append(tuple)
 
-        self.selectQueryTime =  pc()-t0
+        self.selectQueryTime = pc() - t0
         return projectionResult
 
     def processWhere(self, joinResult, clauses):
@@ -122,7 +133,7 @@ class QProcessor:
         i = 0
         conditionList = []
         while i + 3 <= len(clauses):
-            if clauses[i] == "and" or clauses[i] == "or" or clauses[i] == "in":
+            if clauses[i] == " and " or clauses[i] == " or ":
                 conditionList.append(clauses[i])
                 i += 1
                 continue
@@ -146,53 +157,57 @@ class QProcessor:
         # print()
 
         whereResult = []
-        operators = ['<', '>', '=', 'in']
+        operators = ["<", ">", "=", " in "]
         for tuple in joinResult:
             tuple = str(tuple).split(",")
             isTupleValid = []
             for i in range(len(conditionList)):
                 cond = conditionList[i]
-                if cond == "and" or cond == "or" or cond == "in":
+                if cond == " and " or cond == " or " or cond == " in ":
                     isTupleValid.append(cond)
                     continue
-                
+
                 for op in operators:
                     if len(cond.split(op)) > 1:
                         lhs = tuple[self.joinRelationInfo[cond.split(op)[0]]].lower()
-                        rhs = tuple[self.joinRelationInfo[cond.split(op)[1]]].lower() if "." in cond.split(op)[1] else cond.split(op)[1].lower().strip("'")
-                        
-                        if op == '<':
+                        rhs = (
+                            tuple[self.joinRelationInfo[cond.split(op)[1]]].lower()
+                            if "." in cond.split(op)[1]
+                            else cond.split(op)[1].lower().strip("'")
+                        )
+
+                        if op == "<":
                             isTupleValid.append(str(lhs < rhs))
-                        elif op == '>':
+                        elif op == ">":
                             isTupleValid.append(str(lhs > rhs))
-                        elif op == '=':
+                        elif op == "=":
                             isTupleValid.append(str(lhs == rhs))
-                        elif op == 'in':
-                            rhs = rhs.lstrip('(').rstrip(')').split(",")
-                            if(lhs in rhs):
+                        elif op == " in ":
+                            rhs = rhs.lstrip("(").rstrip(")").split(",")
+                            if lhs in rhs:
                                 isTupleValid.append("True")
                             else:
                                 isTupleValid.append("False")
- 
+
             # Single condition case
-            if(len(isTupleValid) == 1):
-                if(isTupleValid[0] == "True"):
+            if len(isTupleValid) == 1:
+                if isTupleValid[0] == "True":
                     whereResult.append(tuple)
                 continue
-            
+
             # multiple condition case
             isValid = False
-            if(isTupleValid[1] == "and"):
+            if isTupleValid[1] == " and ":
                 isValid = eval(isTupleValid[0]) and eval(isTupleValid[2])
-            else:
+            elif isTupleValid[1] == " or ":
                 isValid = eval(isTupleValid[0]) or eval(isTupleValid[2])
-            
-            for i in range(3, len(isTupleValid)-1):
-                if(isTupleValid[i] == "and"):
-                    isValid = isValid and eval(isTupleValid[i+1])
-                elif(isTupleValid[i] == "or"):
-                    isValid = isValid or eval(isTupleValid[i+1])
-            if(isValid):
+
+            for i in range(3, len(isTupleValid) - 1):
+                if isTupleValid[i] == " and ":
+                    isValid = isValid and eval(isTupleValid[i + 1])
+                elif isTupleValid[i] == " or ":
+                    isValid = isValid or eval(isTupleValid[i + 1])
+            if isValid:
                 whereResult.append(tuple)
-    
+
         return whereResult

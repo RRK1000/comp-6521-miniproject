@@ -27,12 +27,14 @@ if __name__ == "__main__":
     q2 = "SELECT product_type, region_name FROM products, regions where origin_region = regions.region_id;"
     q3 = "SELECT product_type FROM products, routes where product = products.product_id AND region_from in (1,2);"
     
-    output = queryprocessor.processSelectQuery(conn, q1)
-    queryprocessor.displayTokens()
+    selectedQuery = q3
+
+    output = queryprocessor.processSelectQuery(conn, selectedQuery)
     print()
-    print(q1)
+    print(selectedQuery)
     for row in output:
         print(row)
+    print("Number of rows: ", len(output))
     print("Time taken by processSelectQuery() in seconds: ", queryprocessor.selectQueryTime)
 
     conn.close()
