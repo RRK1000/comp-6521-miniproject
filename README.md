@@ -8,10 +8,11 @@
 
 ```shell
     $ psql postgres 
-        postgres-#  CREATE ROLE admin WITH LOGIN PASSWORD ‘password’;
-        postgres-#  ALTER ROLE admin CREATEDB;
+        postgres-#  CREATE ROLE postgres WITH LOGIN PASSWORD ‘password’;
+        postgres-#  ALTER ROLE postgres CREATEDB;
+        postgres-#  GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO postgres;
         postgres-#  \q
-    $ psql -h localhost -U admin -f sample_data.sql
+    $ psql -h localhost -U admin -f demo.sql
 ```
 
 # Running the Query Processor
