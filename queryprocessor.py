@@ -3,34 +3,32 @@ from time import perf_counter as pc
 
 
 class QProcessor:
-    project = []
+    projectionList = []
     clauses = []
     relationList = []
     relationInfo = {}
     joinRelationInfo = {}
     selectQueryTime = 0
 
+    # Displays Query Tokens (projections, clauses)
     def displayTokens(self):
-        print("Projection List: ", self.project)
+        print("Projection List: ", self.projectionList)
         print("Clause List: ", self.clauses)
         print("Relation List: ", self.relationList)
-        print("RelationInfo: ", self.relationInfo)
-        print("JoinInfo List:", self.joinRelationInfo)
 
+    # finds the relation of the given column
     def findRelation(self, column) -> str:
         for i in self.relationInfo.keys():
             if column in self.relationInfo[i]:
                 return i
         return ""
 
-    def validateQuery():
-        return
-
+    # Splits the query into query tokens 
     def tokenizeQuery(self, query):
         query = query.lower().strip(";")
 
         # projections
-        self.project.extend(
+        self.projectionList.extend(
             [i.strip(" ") for i in query.split("from")[0].lstrip("select").split(",")]
         )
 
@@ -50,7 +48,7 @@ class QProcessor:
 
         return
 
-    def processJoin(self, conn, relationList):
+    def processJoin(self, conn, relationList) -> list:
         result = []
         relationDataDict = {}
         cursor = conn.cursor()
@@ -93,39 +91,7 @@ class QProcessor:
                 bucket.append(result[i].split(",")[idx])
             result[i] = result[i] + "," + ".".join(map(str, bucket))
         return result
-
-    def processSelectQuery(self, conn, query):
-        t0 = pc()
-
-        self.tokenizeQuery(query)
-
-        # processing relation join
-        joinResult = []
-        if len(self.relationList) > 1:
-            joinResult = self.processJoin(conn, self.relationList)
-        self.displayTokens()
-
-        # processing where clauses
-        whereResult = []
-        whereResult = self.processWhere(joinResult, self.clauses)
-
-        # processing projections
-        projectionResult = []
-        idxList = []
-        for column in self.project:
-            idxList.append(
-                self.joinRelationInfo[self.findRelation(column) + "." + column]
-            )
-        for row in whereResult:
-            tuple = []
-            for idx in idxList:
-                tuple.append(row[idx])
-            tuple.append(str(row[len(row) - 1]))
-            projectionResult.append(tuple)
-
-        self.selectQueryTime = pc() - t0
-        return projectionResult
-
+    
     def processWhere(self, joinResult, clauses):
         # clauses = ['product', '=', 'products.product_id']
         # clauses = ['product', '=', 'products.product_id', 'and', 'region_from', '=', '1']
@@ -211,3 +177,38 @@ class QProcessor:
                 whereResult.append(tuple)
 
         return whereResult
+
+
+    def processSelectQuery(self, conn, query) -> list:
+        t0 = pc()
+
+        self.tokenizeQuery(query)
+
+        # processing relation join
+        joinResult = []
+        if len(self.relationList) > 1:
+            joinResult = self.processJoin(conn, self.relationList)
+        self.displayTokens()
+
+        # processing where clauses
+        whereResult = []
+        whereResult = self.processWhere(joinResult, self.clauses)
+
+        # processing projections
+        projectionResult = []
+        idxList = []
+        for column in self.projectionList:
+            idxList.append(
+                self.joinRelationInfo[self.findRelation(column) + "." + column]
+            )
+        for row in whereResult:
+            tuple = []
+            for idx in idxList:
+                tuple.append(row[idx])
+            tuple.append(str(row[len(row) - 1]))
+            projectionResult.append(tuple)
+
+        self.selectQueryTime = pc() - t0
+        return projectionResult
+
+    
