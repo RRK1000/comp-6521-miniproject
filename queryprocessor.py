@@ -48,6 +48,23 @@ class QProcessor:
 
         return
 
+    def processJoinOnServer(self, conn, relationList, query: str) -> list:
+        result = []
+        cursor = conn.cursor()
+
+        query_parts = query.lower().split(" from ")
+        relationListAnn = ", '.', ".join([name + ".ann" for name in relationList])
+        joinQuery = (
+            query_parts[0] + f", concat({relationListAnn}) from " + query_parts[1]
+        )
+
+        cursor.execute(joinQuery)
+        queryData = cursor.fetchall()
+
+        result = [list(ele) for ele in queryData]
+
+        return result 
+
     def processJoin(self, conn, relationList) -> list:
         result = []
         relationDataDict = {}
