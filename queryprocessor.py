@@ -48,7 +48,7 @@ class QProcessor:
 
         return
 
-    def processJoinOnServer(self, conn, relationList, query: str) -> list:
+    def processJoin(self, conn, relationList, query: str) -> list:
         result = []
         cursor = conn.cursor()
 
@@ -63,45 +63,6 @@ class QProcessor:
 
         result = [list(ele) for ele in queryData]
 
-        return result
-
-    def processJoin(self, conn, relationList) -> list:
-        result = []
-        relationDataDict = {}
-        cursor = conn.cursor()
-        # fetching data from postgresql
-        for relation in relationList:
-            query = """select * from """
-            cursor.execute(query + relation)
-            relationdata = cursor.fetchall()
-            relationColData = {
-                ele: pos
-                for pos, ele in enumerate([desc[0] for desc in cursor.description])
-            }
-            self.relationInfo[relation] = relationColData
-            relationDataDict[relation] = relationdata
-        idx = 0
-        # updating self.joinRelationInfo
-        for relation, info in self.relationInfo.items():
-            for column in info:
-                self.joinRelationInfo[relation + "." + column] = idx
-                idx += 1
-        # computing the cartesian product
-        for tuple in itertools.product(*relationDataDict.values(), repeat=1):
-            row = ""
-            for item in tuple:
-                row += str(item).replace("'", "")
-            resultItem = row.replace(")(", ", ").lstrip("(").rstrip(")").split(", ")
-            result.append(",".join(map(str, resultItem)))
-        idxList = [
-            self.joinRelationInfo[relation + ".ann"] for relation in self.relationList
-        ]
-        # computing the annotated bucket
-        for i in range(len(result)):
-            bucket = []
-            for idx in idxList:
-                bucket.append(result[i].split(",")[idx])
-            result[i] = result[i] + "," + ".".join(map(str, bucket))
         return result
 
     def processSelectQuery(self, conn, query) -> list:
