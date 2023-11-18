@@ -6,7 +6,7 @@ def getDBConn():
     conn = psycopg2.connect(
         database="miniproject",
         user="postgres",
-        password="password",
+        password="1234",
         host="127.0.0.1",
         port="5432",
     )
@@ -26,8 +26,9 @@ if __name__ == "__main__":
     q1 = "select supplier_name from suppliers, routes where supplier = suppliers.supplier_id AND region_to = 5;"
     q2 = "SELECT product_type, region_name FROM products, regions where origin_region = regions.region_id;"
     q3 = "SELECT product_type FROM products, routes where product = products.product_id AND region_from in (1,2);"
+    # q3 = "SELECT daily_credits, tokens FROM users, generation_history where user = users.id AND users.tokens > 10000;"
     
-    selectedQuery = q3
+    selectedQuery = q2
 
     output = queryprocessor.processSelectQuery(conn, selectedQuery)
     print()

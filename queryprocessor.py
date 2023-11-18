@@ -104,17 +104,133 @@ class QProcessor:
             result[i] = result[i] + "," + ".".join(map(str, bucket))
         return result
 
+    def processWhere(self, joinResult, clauses):
+        # clauses = ['product', '=', 'products.product_id']
+        # clauses = ['product', '=', 'products.product_id', 'and', 'region_from', '=', '1']
+        # clauses = ['product', '=', 'products.product_id', 'or', 'region_from', '=', '1']
+        i = 0
+        conditionList = []
+        while i + 3 <= len(clauses):
+            if clauses[i] == " and " or clauses[i] == " or ":
+                conditionList.append(clauses[i])
+                i += 1
+                continue
+
+            # condition processing
+            if "." not in clauses[i]:
+                r = self.findRelation(clauses[i])
+                if r != "":
+                    clauses[i] = str(r) + "." + str(clauses[i])
+
+            if "." not in clauses[i + 2]:
+                r = self.findRelation(clauses[i + 2])
+                if r != "":
+                    clauses[i + 2] = str(r) + "." + str(clauses[i + 2])
+
+            conditionList.append(
+                str(clauses[i]) + str(clauses[i + 1]) + str(clauses[i + 2])
+            )
+            i += 3
+        # print("Condition List:" + ",".join(conditionList))
+        # print()
+
+        whereResult = []
+        operators = ["<", ">", "=", " in "]
+        for tuple in joinResult:
+            tuple = str(tuple).split(",")
+            isTupleValid = []
+            for i in range(len(conditionList)):
+                cond = conditionList[i]
+                if cond == " and " or cond == " or " or cond == " in ":
+                    isTupleValid.append(cond)
+                    continue
+
+                for op in operators:
+                    if len(cond.split(op)) > 1:
+                        lhs = tuple[self.joinRelationInfo[cond.split(op)[0]]].lower()
+                        rhs = (
+                            tuple[self.joinRelationInfo[cond.split(op)[1]]].lower()
+                            if "." in cond.split(op)[1]
+                            else cond.split(op)[1].lower().strip("'")
+                        )
+
+                        if op == "<":
+                            isTupleValid.append(str(lhs < rhs))
+                        elif op == ">":
+                            isTupleValid.append(str(lhs > rhs))
+                        elif op == "=":
+                            isTupleValid.append(str(lhs == rhs))
+                        elif op == " in ":
+                            rhs = rhs.lstrip("(").rstrip(")").split(",")
+                            if lhs in rhs:
+                                isTupleValid.append("True")
+                            else:
+                                isTupleValid.append("False")
+
+            # Single condition case
+            if len(isTupleValid) == 1:
+                if isTupleValid[0] == "True":
+                    whereResult.append(tuple)
+                continue
+
+            # multiple condition case
+            isValid = False
+            if isTupleValid[1] == " and ":
+                isValid = eval(isTupleValid[0]) and eval(isTupleValid[2])
+            elif isTupleValid[1] == " or ":
+                isValid = eval(isTupleValid[0]) or eval(isTupleValid[2])
+
+            for i in range(3, len(isTupleValid) - 1):
+                if isTupleValid[i] == " and ":
+                    isValid = isValid and eval(isTupleValid[i + 1])
+                elif isTupleValid[i] == " or ":
+                    isValid = isValid or eval(isTupleValid[i + 1])
+            if isValid:
+                whereResult.append(tuple)
+
+        return whereResult
+
     def processSelectQuery(self, conn, query) -> list:
         t0 = pc()
 
         query = query.replace("\n", "")
 
         self.tokenizeQuery(query)
-        joinResult = self.processJoin(conn, self.relationList, query)
+
+        # processing relation join
+        joinResult = []
+        if len(self.relationList) > 1:
+            joinResult = self.processJoin(conn, self.relationList)
+        self.displayTokens()
+
+        # processing where clauses
+        whereResult = []
+        whereResult = self.processWhere(joinResult, self.clauses)
+
+        # processing projections
+        projectionResult = []
+        idxList = []
+        for column in self.projectionList:
+            idxList.append(
+                self.joinRelationInfo[self.findRelation(column) + "." + column]
+            )
+        for row in whereResult:
+            tpl = []
+            for idx in idxList:
+                tpl.append(row[idx])
+            tpl.append(str(row[len(row) - 1]))
+            projectionResult.append(tpl)
+
+        # Ignore above code to process query with
+
+        # query = query.replace("\n", "")
+
+        # self.tokenizeQuery(query)
+        # projectionResult = self.processJoinOnServer(conn, self.relationList, query)
 
         merged_data = {}
 
-        for item in joinResult:
+        for item in projectionResult:
             key = tuple(item[:-1])
             value = item[-1]
             if key in merged_data:
@@ -122,7 +238,7 @@ class QProcessor:
             else:
                 merged_data[key] = value
 
-        joinResult = [list(key) + [values] for key, values in merged_data.items()]
+        projectionResult = [list(key) + [values] for key, values in merged_data.items()]
 
         self.selectQueryTime = pc() - t0
-        return joinResult
+        return projectionResult
