@@ -32,8 +32,8 @@ if __name__ == "__main__":
     output = queryprocessor.processSelectQuery(conn, selectedQuery)
     print()
     print(selectedQuery)
-    for row in output:
-        print(row)
+    # for row in output:
+    #     print(row)
     print("Number of rows: ", len(output))
     print("Time taken by processSelectQuery() in seconds: ", queryprocessor.selectQueryTime)
 

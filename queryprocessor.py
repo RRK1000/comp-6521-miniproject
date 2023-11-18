@@ -94,6 +94,8 @@ class QProcessor:
             }
             self.relationInfo[relation] = relationColData
             relationDataDict[relation] = relationdata
+        
+        t0 = pc()
 
         idx = 0
         # updating self.joinRelationInfo
@@ -119,17 +121,17 @@ class QProcessor:
             bucket = []
             for idx in idxList:
                 bucket.append(result[i].split(",")[idx])
-            print(result[i], bucket)
             
             result[i] = result[i] + "," + ".".join(map(str, bucket))
-    
+        print("Time taken for manual join: ", pc() - t0)
+
         return result
     
     def processSortJoin(self, conn, clauses, relationList) -> list:
         result = []
         relationDataDict = {}
         cursor = conn.cursor()
-        print(relationList)
+
         # fetching data from postgresql
         for relation in relationList:
             query = """select * from """
@@ -194,7 +196,6 @@ class QProcessor:
 
                     tmpTupleR = tupleR
                     tmpTupleS = tupleS
-                    print(tmpTupleR, tmpTupleS)
                     swapFlag = False
                     if lhs.split(".")[0] != relationRName:
                         tmpLhs, tmpRhs = tmpRhs, tmpLhs
@@ -233,7 +234,6 @@ class QProcessor:
             bucket = []
             for idx in idxList:
                 bucket.append(result[i][idx])
-            print(result[i], bucket)
             result[i] = result[i] + tuple([".".join(map(str, bucket))])
             result[i] = ','.join(map(str, result[i]))
 
@@ -334,9 +334,9 @@ class QProcessor:
         # processing relation join
         joinResult = []
         if len(self.relationList) > 1:
-            joinResult = self.processJoin(conn, self.relationList)
-            # joinResult = self.processSortJoin(conn, self.clauses, self.relationList)
-        self.displayTokens()
+            # joinResult = self.processJoin(conn, self.relationList)
+            joinResult = self.processSortJoin(conn, self.clauses, self.relationList)
+        # self.displayTokens()
    
         # processing where clauses
         whereResult = []
