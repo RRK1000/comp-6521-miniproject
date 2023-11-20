@@ -1,7 +1,7 @@
 import itertools
 import ast
 from time import perf_counter as pc
-
+import bitmap
 
 class QProcessor:
     projectionList = []
