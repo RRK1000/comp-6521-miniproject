@@ -58,7 +58,6 @@ def generateBitmap(tableName, attribute, primaryKey_Column, attribute_type):
         for value, bitmap in bitmap_dict.items():
             Bit=str(bin(bitmap))
             # to compress bitmap
-            # need to implement compressor
             compressedBitmap=compressBitmap(Bit[2:][::-1])
             csv_writer.writerow([value, compressedBitmap])
 
@@ -69,7 +68,6 @@ def generateBitmap(tableName, attribute, primaryKey_Column, attribute_type):
 def compressBitmap(bit):
 
     compressedBitmap=""
-
     index=0
 
     for c in bit:
@@ -91,3 +89,57 @@ def compressBitmap(bit):
             index+=1
 
     return compressedBitmap
+
+def extractBitmap(fileName):
+
+    bitmap_dict={}
+
+    csv_file_path = fileName
+
+    # Read the CSV file and populate the bitmap_dict
+    with open(csv_file_path, 'r') as csv_file:
+        csv_reader = csv.reader(csv_file)
+        
+        # Skip the header row
+        next(csv_reader)
+        
+        # Read data and populate bitmap_dict
+        for row in csv_reader:
+            value, bitmap = row
+            decompressedBitmap=decompressBitmap(bitmap)
+            bitmap_dict[int(value)] = decompressedBitmap
+        
+    # Print the contents of bitmap_dict
+    # for value, bitmap in bitmap_dict.items():
+    #     print(f"Value: {value}, Bitmap: {bitmap}")
+
+    return bitmap_dict
+
+def decompressBitmap(bitmap):
+
+    decompressedBitmap=""
+
+    index=0
+    runLengthUnary=0
+
+    while index<len(bitmap):
+
+        runLengthUnary+=1
+
+        if bitmap[index]=='0':
+            runLengthBinary=bitmap[index+1: index+runLengthUnary+1]
+            runLengthInteger=int(runLengthBinary, 2)
+
+            while runLengthInteger!=0:
+                decompressedBitmap+='0'
+                runLengthInteger-=1
+
+            decompressedBitmap+='1'
+
+            index+=runLengthUnary+1
+            runLengthUnary=0
+        
+        else:
+            index+=1
+    
+    return decompressedBitmap
