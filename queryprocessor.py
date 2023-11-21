@@ -290,6 +290,57 @@ class QProcessor:
 
         return result
 
+    def processBitmapJoin(self, conn, clauses, relationList) -> list:
+        result=[]
+        relationDataDict={}
+        cursor=conn.cursor()
+        print("clauses ar-------------------------")
+        print(clauses)
+
+        # fetching data from postgresql
+        for relation in relationList:
+            cursor.execute(query + relation)
+            relationdata = cursor.fetchall()
+            relationColData = {
+                ele: pos
+                for pos, ele in enumerate([desc[0] for desc in cursor.description])
+            }
+            self.relationInfo[relation] = relationColData
+            relationDataDict[relation] = relationdata
+
+        relationR = relationDataDict[relationList[0]]
+        relationS = relationDataDict[relationList[1]]
+        relationRName = relationList[0]
+        relationSName = relationList[1]
+
+        print("---------------------------------------")
+        print("---------------------------------------")
+        print("realtion R")
+        print(relationRName)
+        print(relationR)
+
+        print("---------------------------------------")
+        print()
+        print("relationS")
+        print(relationSName)
+        print(relationS)
+        print("-----------------------------------------------------------")
+        print(self.relationInfo)
+        print(self.joinRelationInfo)
+        print(self.relationList)
+        print(self.generateConditionList(clauses))
+
+        # generate bitmap csv files
+        for key in self.joinRelationInfo:
+            tableName = key.split(".")[0]
+            attribute = key.split(".")[1]
+            primaryKey_Column = next(iter(self.relationInfo.get(tableName)))
+            bitmap.generateBitmap(tableName, attribute, primaryKey_Column)
+
+        
+
+        return result
+
     def processWhere(self, joinResult, clauses):
         # clauses = ['product', '=', 'products.product_id']
         # clauses = ['product', '=', 'products.product_id', 'and', 'region_from', '=', '1']
@@ -388,6 +439,7 @@ class QProcessor:
         if len(self.relationList) > 1:
             # joinResult = self.processJoin(conn, self.relationList)
             joinResult = self.processSortJoin(conn, self.clauses, self.relationList)
+            joinResult=self.processBitmapJoin(conn, self.clauses, self.relationList)
         # self.displayTokens()
 
         # processing where clauses
