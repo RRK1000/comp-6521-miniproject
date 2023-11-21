@@ -14,7 +14,7 @@ conn = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, 
 
 def generateBitmap(tableName, attribute, primaryKey_Column):
 
-    bitmapAlreadyExists=os.path.isfile('bitmap_index_'+tableName+'_'+attribute+'.csv')
+    bitmapAlreadyExists=os.path.isfile('bitmap_index_'+tableName+'.'+attribute+'.csv')
 
     if(bitmapAlreadyExists):
         print("Bitmap already made!")
@@ -46,14 +46,14 @@ def generateBitmap(tableName, attribute, primaryKey_Column):
         for row_id in rows_with_value:
             bitmap |= (1 << row_id)
 
-        bitmap_dict[value] = int(bitmap/2)
+        bitmap_dict[value] = int(bitmap)
 
-    csv_file_path = 'bitmap_index_'+tableName+'_'+attribute+'.csv'
+    csv_file_path = 'bitmap_index_'+tableName+'.'+attribute+'.csv'
 
     bitmap_dict=dict(sorted(bitmap_dict.items()))
 
     with open(csv_file_path, 'w', newline='') as csv_file:
-        csv_writer = csv.writer(csv_file)    
+        csv_writer = csv.writer(csv_file)
         csv_writer.writerow(['Value', 'Bitmap'])
 
         for value, bitmap in bitmap_dict.items():
