@@ -238,12 +238,13 @@ class QProcessor:
                         lhs, rhs = rhs, lhs
                         tmpTupleR, tmpTupleS = tmpTupleS, tmpTupleR
                         swapFlag = True
-
+# 4
                     lhsIdx = (
                         self.relationInfo[lhs.split(".")[0]][lhs.split(".")[1]]
                         if lhs != None
                         else None
                     )
+                    # 0
                     rhsIdx = (
                         self.relationInfo[rhs.split(".")[0]][rhs.split(".")[1]]
                         if rhs != None
@@ -311,6 +312,8 @@ class QProcessor:
 
         relationR = relationDataDict[relationList[0]]
         relationS = relationDataDict[relationList[1]]
+        print("relation R")
+        print(relationR)
         relationRName = relationList[0]
         relationSName = relationList[1]
         print(self.relationInfo)
@@ -375,14 +378,66 @@ class QProcessor:
                 print("rhs bitmap")
                 print(rhsBitmap)
 
+                finalBitmap={}
+
+                for key, bit1 in lhsBitmap.items():
+                    if key in rhsBitmap.keys():
+                        print("for key")
+                        print(key)
+
+                        print("swap check")
+                        print(lhs.split(".")[0])
+                        print(relationRName)
+
+                        # review
+                        if lhs.split(".")[0] == relationRName:
+                            tempRelation=relationR
+                            relationR=relationS
+                            relationS=tempRelation
+
+                        indexOf1R = ( [pos for pos, char in enumerate(bit1) if char == '1'])
+                        indexOf1S = ( [pos for pos, char in enumerate(rhsBitmap.get(key)) if char == '1'])
+
+                        print("final join")
+                        for pos1R in indexOf1R:
+                            for pos1S in indexOf1S:
+                                print("pos1R")
+                                print(pos1R)
+                                print("pos1S")
+                                print(pos1S)
+                                tuple1=relationS[pos1R-1]
+                                tuple2=relationR[pos1S-1]
+                                print(tuple1+tuple2)
+
+                        # tempTableRrow=""
+                        # tempTableSrow=""
+
+
+                print("this is final Dict")
+
             # if range query..... handle differently
             if rhs=="range":
                 lhsBitmap = bitmap.extractBitmap("bitmap_index_"+lhs+".csv")
-                print("lhs bitmap in range")
-                print(lhsBitmap)
+                # print("lhs bitmap in range")
+                # print(lhsBitmap)
 
 
         return result
+    
+    def andOnBitString(self, bit1, bit2):
+        bitString=""
+
+        minLen=min(len(bit1), len(bit2))
+
+        while minLen!=0:
+            if bit1[minLen-1] == "1" and bit2[minLen-1]=="1":
+                bitString="1"+bitString
+            else:
+                bitString="0"+bitString
+                
+            minLen-=1
+
+        return bitString
 
     def processWhere(self, joinResult, clauses):
         # clauses = ['product', '=', 'products.product_id']
