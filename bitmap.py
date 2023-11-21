@@ -6,13 +6,13 @@ import os
 # Replace these with your actual database connection parameters
 dbname = 'miniproject'
 user = 'postgres'
-password = 'abcd@#A123'
+password = 'password'
 host = '127.0.0.1'
 port = '5432'
 
 conn = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port)
 
-def generateBitmap(tableName, attribute, primaryKey_Column, attribute_type):
+def generateBitmap(tableName, attribute, primaryKey_Column):
 
     bitmapAlreadyExists=os.path.isfile('bitmap_index_'+tableName+'_'+attribute+'.csv')
 
@@ -37,10 +37,9 @@ def generateBitmap(tableName, attribute, primaryKey_Column, attribute_type):
 
     for value in unique_values:
         bitmap = 0
-        if attribute_type=="string":
-            rows_with_value_query = f'SELECT {primaryKey_Column} FROM {tableName} WHERE {attribute} = \'{value}\''
-        else:
-            rows_with_value_query = f'SELECT {primaryKey_Column} FROM {tableName} WHERE {attribute} = {value}'
+        
+        rows_with_value_query = f'SELECT {primaryKey_Column} FROM {tableName} WHERE {attribute} = \'{value}\''
+        
         cursor.execute(rows_with_value_query)
         rows_with_value = [row[0] for row in cursor.fetchall()]
 
@@ -50,6 +49,8 @@ def generateBitmap(tableName, attribute, primaryKey_Column, attribute_type):
         bitmap_dict[value] = int(bitmap/2)
 
     csv_file_path = 'bitmap_index_'+tableName+'_'+attribute+'.csv'
+
+    bitmap_dict=dict(sorted(bitmap_dict.items()))
 
     with open(csv_file_path, 'w', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)    
@@ -61,9 +62,8 @@ def generateBitmap(tableName, attribute, primaryKey_Column, attribute_type):
             compressedBitmap=compressBitmap(Bit[2:][::-1])
             csv_writer.writerow([value, compressedBitmap])
 
-    print(f"Bitmap created and saved in are saved in {csv_file_path}")
+    print(f"Bitmap created and saved in {csv_file_path}")
 
-    conn.close()
 
 def compressBitmap(bit):
 
@@ -82,7 +82,6 @@ def compressBitmap(bit):
 
             compressedBitmap+='0'+runLengthInBinary
 
-            print(compressedBitmap)
             index=0
         
         else:
@@ -108,10 +107,6 @@ def extractBitmap(fileName):
             value, bitmap = row
             decompressedBitmap=decompressBitmap(bitmap)
             bitmap_dict[int(value)] = decompressedBitmap
-        
-    # Print the contents of bitmap_dict
-    # for value, bitmap in bitmap_dict.items():
-    #     print(f"Value: {value}, Bitmap: {bitmap}")
 
     return bitmap_dict
 
