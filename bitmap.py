@@ -17,19 +17,12 @@ def generateBitmap(tableName, attribute, primaryKey_Column):
     bitmapAlreadyExists=os.path.isfile('bitmap_index_'+tableName+'.'+attribute+'.csv')
 
     if(bitmapAlreadyExists):
-        print("Bitmap already made!")
+        # print("Bitmap already made!")
         return
     
     cursor = conn.cursor()
 
     bitmap_dict = {}
-
-    # tableName="routes"
-    # attribute="route_id"
-    # primaryKey_Column="route_id"
-    # # attribute_type can be string or number
-    # # attribute_type="string"
-    # attribute_type="number"
 
     unique_values_query = f'SELECT DISTINCT {attribute} FROM {tableName}'
     cursor.execute(unique_values_query)
@@ -62,7 +55,7 @@ def generateBitmap(tableName, attribute, primaryKey_Column):
             compressedBitmap=compressBitmap(Bit[2:][::-1])
             csv_writer.writerow([value, compressedBitmap])
 
-    print(f"Bitmap created and saved in {csv_file_path}")
+    # print(f"Bitmap created and saved in {csv_file_path}")
 
 
 def compressBitmap(bit):
