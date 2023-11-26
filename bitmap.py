@@ -17,7 +17,7 @@ def generateBitmap(tableName, attribute, primaryKey_Column):
     bitmapAlreadyExists=os.path.isfile('bitmap_index_'+tableName+'.'+attribute+'.csv')
 
     if(bitmapAlreadyExists):
-        print("Bitmap already made!")
+        # print("Bitmap already made!")
         return
     
     cursor = conn.cursor()
