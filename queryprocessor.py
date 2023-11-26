@@ -501,8 +501,9 @@ class QProcessor:
         # processing relation join
         joinResult = []
         if len(self.relationList) > 1:
-            # joinResult = self.processJoin(conn, self.relationList)
-            # joinResult = self.processSortJoin(conn, self.clauses, self.relationList)
+            joinResult = self.processJoin(conn, self.relationList)
+            joinResult = self.processSortJoin(conn, self.clauses, self.relationList)
+            joinResult = self.processOptimizedSortJoin(conn, self.clauses, self.relationList)
             joinResult = list(set(self.processBitmapJoin(conn, self.clauses, self.relationList)))
 
         # processing where clauses
@@ -537,3 +538,177 @@ class QProcessor:
 
         self.selectQueryTime = pc() - t0
         return projectionResult
+
+    def processOptimizedSortJoin(self, conn, clauses, relationList) -> list:
+        result = []
+        relationDataDict = {}
+        cursor = conn.cursor()
+
+        # fetching data from postgresql
+        for relation in relationList:
+            query = """select * from """
+            cursor.execute(query + relation)
+            relationdata = cursor.fetchall()
+            relationColData = {
+                ele: pos
+                for pos, ele in enumerate([desc[0] for desc in cursor.description])
+            }
+            self.relationInfo[relation] = relationColData
+            relationDataDict[relation] = relationdata
+
+        relationR = relationDataDict[relationList[0]]
+        relationS = relationDataDict[relationList[1]]
+        relationRName = relationList[0]
+        relationSName = relationList[1]
+
+        t0 = pc()
+        idx = 0
+        for relation, info in self.relationInfo.items():
+            for column in info:
+                self.joinRelationInfo[relation + "." + column] = idx
+                idx += 1
+
+        # sorting relations
+        conditionList = self.generateConditionList(clauses)
+        # print(conditionList)
+        for cond in conditionList:
+            if cond in [" and ", " or "]:
+                continue
+
+            tmpLhs = (
+                cond.split("=")[0]
+                if len(cond.split("=")) > 1
+                else cond.split(" in ")[0]
+            )
+            lhs = tmpLhs if "." in tmpLhs else None
+            tmpRhs = (
+                cond.split("=")[1]
+                if len(cond.split("=")) > 1
+                else cond.split(" in ")[1]
+            )
+            rhs = tmpRhs if "." in tmpRhs else None
+
+            if lhs.split(".")[0] != relationRName:
+                tmpLhs, tmpRhs = tmpRhs, tmpLhs
+                lhs, rhs = rhs, lhs
+
+            lhsIdx = (
+                self.relationInfo[lhs.split(".")[0]][lhs.split(".")[1]]
+                if lhs != None
+                else None
+            )
+            rhsIdx = (
+                self.relationInfo[rhs.split(".")[0]][rhs.split(".")[1]]
+                if rhs != None
+                else None
+            )
+
+            relationR.sort(key=lambda x: x[lhsIdx]) if lhsIdx != None else None
+            relationS.sort(key=lambda x: x[rhsIdx]) if rhsIdx != None else None
+
+        i = j = 0
+        n = len(relationR)
+        m = len(relationS)
+        
+        # computing join after sort
+        while(i<n):
+            j = 0
+            while(j<m):
+                isValid = True
+                for cond in conditionList:
+                    tupleR = relationR[i]
+                    tupleS = relationS[j]
+
+                    if cond in [" and ", " or "]:
+                        continue
+
+                    tmpLhs = (
+                        cond.split("=")[0]
+                        if len(cond.split("=")) > 1
+                        else cond.split(" in ")[0]
+                    )
+                    lhs = tmpLhs if "." in tmpLhs else None
+                    tmpRhs = (
+                        cond.split("=")[1]
+                        if len(cond.split("=")) > 1
+                        else cond.split(" in ")[1]
+                    )
+                    if tmpRhs[0] == "(":
+                        tmpRhs = eval(tmpRhs)
+                    rhs = tmpRhs if "." in tmpRhs else None
+
+                    tmpTupleR = tupleR
+                    tmpTupleS = tupleS
+                    swapFlag = False
+                    if lhs.split(".")[0] != relationRName:
+                        tmpLhs, tmpRhs = tmpRhs, tmpLhs
+                        lhs, rhs = rhs, lhs
+                        tmpTupleR, tmpTupleS = tmpTupleS, tmpTupleR
+                        swapFlag = True
+
+                    lhsIdx = (
+                        self.relationInfo[lhs.split(".")[0]][lhs.split(".")[1]]
+                        if lhs != None
+                        else None
+                    )
+                    # 0
+                    rhsIdx = (
+                        self.relationInfo[rhs.split(".")[0]][rhs.split(".")[1]]
+                        if rhs != None
+                        else None
+                    )
+                    if swapFlag:
+                        lhsIdx, rhsIdx = rhsIdx, lhsIdx
+
+                    if (
+                        (
+                            rhsIdx != None
+                            and str(tmpTupleR[lhsIdx]) == str(tmpTupleS[rhsIdx])
+                        )
+                        or (swapFlag and str(tmpTupleR[lhsIdx]) == str(tmpLhs))
+                        or (str(tmpTupleR[lhsIdx]) == str(tmpRhs))
+                        or (type(tmpRhs) == tuple and int(tmpTupleR[lhsIdx]) in tmpRhs)
+                        or (
+                            swapFlag
+                            and type(tmpLhs) == tuple
+                            and int(tmpTupleR[lhsIdx]) in tmpLhs
+                        )
+                    ):
+                        j += 1
+                        result.append(tupleR + tupleS)
+                        continue
+                    
+                    
+                    if ( not (
+                            rhsIdx != None
+                            and str(tmpTupleR[lhsIdx]) == str(tmpTupleS[rhsIdx])
+                        )
+                        or (swapFlag and str(tmpTupleR[lhsIdx]) == str(tmpLhs))
+                        or (str(tmpTupleR[lhsIdx]) == str(tmpRhs))
+                        or (type(tmpRhs) == tuple and int(tmpTupleR[lhsIdx]) in tmpRhs)
+                        or (
+                            swapFlag
+                            and type(tmpLhs) == tuple
+                            and int(tmpTupleR[lhsIdx]) in tmpLhs
+                        )):
+                        isValid = False
+                        break
+                if not isValid:
+                    j += 1
+                    continue
+            i += 1
+        print("Time taken for optimized sort based join: ", pc() - t0)
+
+        idxList = [
+            self.joinRelationInfo[relation + ".ann"] for relation in self.relationList
+        ]
+
+        # computing the annotated bucket
+        for i in range(len(result)):
+            bucket = []
+            for idx in idxList:
+                bucket.append(result[i][idx])
+            result[i] = result[i] + tuple([".".join(map(str, bucket))])
+            result[i] = ",".join(map(str, result[i]))
+
+        return result
