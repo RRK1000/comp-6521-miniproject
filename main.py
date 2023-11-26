@@ -1,6 +1,6 @@
+import sys
 import psycopg2
 import queryprocessor
-
 
 def getDBConn():
     conn = psycopg2.connect(
@@ -28,8 +28,8 @@ if __name__ == "__main__":
     q4 = "SELECT A2, A3 FROM R, S WHERE R.A2 = S.B2 AND R.A3 = S.B3;"
 
     selectedQuery = q4
+    output = queryprocessor.processSelectQuery(conn, selectedQuery, int(sys.argv[1]))
 
-    output = queryprocessor.processSelectQuery(conn, selectedQuery)
     print()
     print(selectedQuery)
     for row in output:
