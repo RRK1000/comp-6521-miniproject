@@ -323,8 +323,7 @@ class QProcessor:
         for key in self.joinRelationInfo:
             tableName = key.split(".")[0]
             attribute = key.split(".")[1]
-            primaryKey_Column = next(iter(self.relationInfo.get(tableName)))
-            bitmap.generateBitmap(tableName, attribute, primaryKey_Column)
+            bitmap.generateBitmap(tableName, attribute, "i")
 
         idx = 0
         for relation, info in self.relationInfo.items():
@@ -359,11 +358,11 @@ class QProcessor:
             if rhs!="range":
                 lhsBitmap = bitmap.extractBitmap("bitmap_index_"+lhs+".csv")
                 rhsBitmap = bitmap.extractBitmap("bitmap_index_"+rhs+".csv")
-
                 isSwap = False
                 if len(lhs.split(".")) > 1 and (lhs.split(".")[0] == relationRName):
                     relationR, relationS = relationS, relationR
                     isSwap = True
+
                 for key, bit1 in lhsBitmap.items():
                     if key in rhsBitmap.keys():
 
@@ -387,7 +386,6 @@ class QProcessor:
             result[i] = result[i] + tuple([".".join(map(str, bucket))])
             result[i] = ",".join(map(str, result[i]))
         print("Time taken for bitmap based join: ", pc() - t0)
-        
         return result
 
     def andOnBitString(self, bit1, bit2):
@@ -491,7 +489,7 @@ class QProcessor:
 
         return whereResult
 
-    def processSelectQuery(self, conn, query) -> list:
+    def processSelectQuery(self, conn, query: str) -> list:
         t0 = pc()
 
         query = query.replace("\n", "")
@@ -523,6 +521,13 @@ class QProcessor:
                 tpl.append(row[idx])
             tpl.append(str(row[len(row) - 1]))
             projectionResult.append(tpl)
+
+
+        # Comment above code and uncomment below lines to execute processJoinOnServer
+
+        # query = query.replace("\n", "")
+        # self.tokenizeQuery(query)
+        # projectionResult = self.processJoinOnServer(conn, self.relationList, query)
 
         merged_data = {}
 
