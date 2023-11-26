@@ -2,6 +2,7 @@ import itertools
 import ast
 from time import perf_counter as pc
 import bitmap
+import tracemalloc
 
 class QProcessor:
     projectionList = []
@@ -489,20 +490,26 @@ class QProcessor:
 
         return whereResult
 
-    def processSelectQuery(self, conn, query: str) -> list:
+    def processSelectQuery(self, conn, query, jointype) -> list:
         t0 = pc()
+        tracemalloc.start()
+
 
         query = query.replace("\n", "")
 
         self.tokenizeQuery(query)
 
-        # processing relation join
         joinResult = []
         if len(self.relationList) > 1:
-            joinResult = self.processJoin(conn, self.relationList)
-            joinResult = self.processSortJoin(conn, self.clauses, self.relationList)
-            joinResult = self.processOptimizedSortJoin(conn, self.clauses, self.relationList)
-            joinResult = list(set(self.processBitmapJoin(conn, self.clauses, self.relationList)))
+            if jointype == 2:
+                joinResult = self.processSortJoin(conn, self.clauses, self.relationList)
+            elif jointype == 3:
+                joinResult = self.processOptimizedSortJoin(conn, self.clauses, self.relationList)
+            elif jointype == 4:
+                joinResult = list(set(self.processBitmapJoin(conn, self.clauses, self.relationList)))
+            else:
+                joinResult = self.processJoin(conn, self.relationList)
+
 
         # processing where clauses
         whereResult = []
@@ -542,6 +549,8 @@ class QProcessor:
         projectionResult = [list(key) + [values] for key, values in merged_data.items()]
 
         self.selectQueryTime = pc() - t0
+        print("Peak memory [MB]: ", tracemalloc.get_traced_memory()[0]/(1024*1024))
+        tracemalloc.stop()
         return projectionResult
 
     def processOptimizedSortJoin(self, conn, clauses, relationList) -> list:
@@ -702,7 +711,7 @@ class QProcessor:
                     j += 1
                     continue
             i += 1
-        print("Time taken for optimized sort based join: ", pc() - t0)
+        
 
         idxList = [
             self.joinRelationInfo[relation + ".ann"] for relation in self.relationList
@@ -716,4 +725,5 @@ class QProcessor:
             result[i] = result[i] + tuple([".".join(map(str, bucket))])
             result[i] = ",".join(map(str, result[i]))
 
+        print("Time taken for optimized sort based join: ", pc() - t0)
         return result
