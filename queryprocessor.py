@@ -238,7 +238,7 @@ class QProcessor:
                         lhs, rhs = rhs, lhs
                         tmpTupleR, tmpTupleS = tmpTupleS, tmpTupleR
                         swapFlag = True
-# 4
+
                     lhsIdx = (
                         self.relationInfo[lhs.split(".")[0]][lhs.split(".")[1]]
                         if lhs != None
@@ -271,7 +271,6 @@ class QProcessor:
                     else:
                         isValid = False
                         break
-
                 if not isValid:
                     continue
                 result.append(tupleR + tupleS)
@@ -307,6 +306,8 @@ class QProcessor:
             }
             self.relationInfo[relation] = relationColData
             relationDataDict[relation] = relationdata
+
+        t0 = pc()
 
         idx = 0
         for relation, info in self.relationInfo.items():
@@ -385,6 +386,8 @@ class QProcessor:
                 bucket.append(result[i][idx])
             result[i] = result[i] + tuple([".".join(map(str, bucket))])
             result[i] = ",".join(map(str, result[i]))
+        print("Time taken for bitmap based join: ", pc() - t0)
+        
         return result
 
     def andOnBitString(self, bit1, bit2):
@@ -519,13 +522,6 @@ class QProcessor:
                 tpl.append(row[idx])
             tpl.append(str(row[len(row) - 1]))
             projectionResult.append(tpl)
-
-        # Ignore above code to process query with
-
-        # query = query.replace("\n", "")
-
-        # self.tokenizeQuery(query)
-        # projectionResult = self.processJoinOnServer(conn, self.relationList, query)
 
         merged_data = {}
 

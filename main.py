@@ -25,14 +25,15 @@ if __name__ == "__main__":
     q1 = "select supplier_name from suppliers, routes where supplier = suppliers.supplier_id AND region_to = 5;"
     q2 = "SELECT product_type, region_name FROM products, regions where origin_region = regions.region_id;"
     q3 = "SELECT product_type FROM products, routes where product = products.product_id AND region_from in (1,2);"
+    q4 = "SELECT A2, A3 FROM R, S WHERE R.A2 = S.B2 AND R.A3 = S.B3;"
 
-    selectedQuery = q3
+    selectedQuery = q4
 
     output = queryprocessor.processSelectQuery(conn, selectedQuery)
     print()
     print(selectedQuery)
-    # for row in output:
-    #     print(row)
+    for row in output:
+        print(row)
     print("Number of rows: ", len(output))
     print(
         "Time taken by processSelectQuery() in seconds: ",
