@@ -172,7 +172,6 @@ class QProcessor:
 
         # sorting relations
         conditionList = self.generateConditionList(clauses)
-        # print(conditionList)
         for cond in conditionList:
             if cond in [" and ", " or "]:
                 continue
@@ -245,7 +244,6 @@ class QProcessor:
                         if lhs != None
                         else None
                     )
-                    # 0
                     rhsIdx = (
                         self.relationInfo[rhs.split(".")[0]][rhs.split(".")[1]]
                         if rhs != None
@@ -504,9 +502,9 @@ class QProcessor:
             if jointype == 2:
                 joinResult = self.processSortJoin(conn, self.clauses, self.relationList)
             elif jointype == 3:
-                joinResult = self.processOptimizedSortJoin(conn, self.clauses, self.relationList)
-            elif jointype == 4:
                 joinResult = list(set(self.processBitmapJoin(conn, self.clauses, self.relationList)))
+            elif jointype == 4:
+                joinResult = self.processOptimizedSortJoin(conn, self.clauses, self.relationList)
             else:
                 joinResult = self.processJoin(conn, self.relationList)
 
