@@ -1,5 +1,4 @@
 import itertools
-import ast
 from time import perf_counter as pc
 import bitmap
 import tracemalloc
@@ -429,8 +428,6 @@ class QProcessor:
                 str(clauses[i]) + str(clauses[i + 1]) + str(clauses[i + 2])
             )
             i += 3
-        # print("Condition List:" + ",".join(conditionList))
-        # print()
 
         whereResult = []
         operators = ["<", ">", "=", " in "]
@@ -503,8 +500,6 @@ class QProcessor:
                 joinResult = self.processSortJoin(conn, self.clauses, self.relationList)
             elif jointype == 3:
                 joinResult = list(set(self.processBitmapJoin(conn, self.clauses, self.relationList)))
-            elif jointype == 4:
-                joinResult = self.processOptimizedSortJoin(conn, self.clauses, self.relationList)
             else:
                 joinResult = self.processJoin(conn, self.relationList)
 

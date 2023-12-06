@@ -7,6 +7,7 @@
 # Configure the Postgres Database Server (with sample data)
 
 ```shell
+    $ cd sql/
     $ psql postgres 
         postgres-#  CREATE ROLE postgres WITH LOGIN PASSWORD ‘password’;
         postgres-#  ALTER ROLE postgres CREATEDB;
@@ -16,7 +17,16 @@
 ```
 
 # Running the Query Processor
+
+Join types:
+- 1 : Cross Product Join
+- 2 : Sort Based Join
+- 3 : Bitmap Index Based Join
+
 ```shell 
-    $ pip3 install psycopg2
-    $ python3 main.py
+    $ pip install -r requirements.txt
+    $ python3 main.py <join_type>
+    
+    Example Usage: 
+    $ python3 main.py 2
 ```
